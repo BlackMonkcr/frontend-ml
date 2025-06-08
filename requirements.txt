@@ -12,7 +12,7 @@ scipy>=1.10.1
 
 # Image processing libraries
 Pillow>=9.4.0
-opencv-python>=4.7.1.72
+opencv-python-headless>=4.7.1.72
 scikit-image>=0.20.0
 
 # Web requests
