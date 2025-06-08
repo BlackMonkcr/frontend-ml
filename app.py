@@ -172,7 +172,7 @@ def load_preprocessing_pipeline():
     try:
         # Usar la misma ruta que el modelo principal
         model_path = "visual_clustering_model/visual_clustering_analyzer.pkl"
-        
+
         try:
             with open(model_path, 'rb') as f:
                 analyzer = pickle.load(f)
@@ -180,11 +180,11 @@ def load_preprocessing_pipeline():
                 return analyzer
         except FileNotFoundError:
             st.warning(f"⚠️ No se encontró el modelo en: {model_path}")
-            
+
         # Si no se encuentra, crear un pipeline básico usando los parámetros conocidos
         st.warning("⚠️ Creando pipeline básico...")
         return create_basic_pipeline()
-        
+
     except Exception as e:
         st.error(f"Error cargando pipeline: {str(e)}")
         return create_basic_pipeline()
@@ -204,17 +204,17 @@ def create_basic_pipeline():
                 min_dist=0.1,
                 metric='euclidean'            )
             self.is_fitted = False
-            
+
         def fit_transform_single(self, features):
             """Transforma una sola muestra usando estadísticas del dataset de entrenamiento"""
             try:
                 # Cargar estadísticas del dataset de entrenamiento
                 train_data = pd.read_csv('movie_data_complete.csv')
                 train_features = train_data.iloc[:, 4:14].values  # Columnas 4-13 (features 0-9)
-                
+
                 # Normalizar usando las estadísticas del conjunto de entrenamiento
                 features_scaled = (features - np.mean(train_features, axis=0)) / (np.std(train_features, axis=0) + 1e-8)
-                
+
                 return features_scaled
             except Exception as e:
                 st.error(f"Error en fit_transform_single: {str(e)}")
@@ -224,7 +224,7 @@ def create_basic_pipeline():
                     return normalized[:10]
                 else:
                     return np.pad(normalized, (0, 10-len(normalized)), 'constant')
-            
+
     return BasicPipeline()
 
 def apply_preprocessing_pipeline(features, pipeline=None):
@@ -235,15 +235,15 @@ def apply_preprocessing_pipeline(features, pipeline=None):
     try:
         if pipeline is None:
             pipeline = load_preprocessing_pipeline()
-            
+
         if pipeline is None:
             st.error("❌ No se pudo cargar el pipeline de preprocesamiento")
             return None
-            
+
         # Asegurar que features sea un array 2D
         if len(features.shape) == 1:
             features = features.reshape(1, -1)
-            
+
         # Si el pipeline tiene métodos fit/transform, usarlos
         if hasattr(pipeline, 'transform') and hasattr(pipeline, 'features_scaled'):
             # Pipeline completo pre-entrenado
@@ -253,14 +253,14 @@ def apply_preprocessing_pipeline(features, pipeline=None):
                     return reduced_features[0]
             except:
                 pass
-                
+
         # Si no, usar el pipeline básico
         if hasattr(pipeline, 'fit_transform_single'):
             return pipeline.fit_transform_single(features[0])
-            
+
         # Fallback: usar transformación simple basada en dataset de entrenamiento
         return apply_simple_normalization(features[0])
-        
+
     except Exception as e:
         st.error(f"Error en pipeline de preprocesamiento: {str(e)}")
         return apply_simple_normalization(features[0])
@@ -272,33 +272,33 @@ def apply_simple_normalization(features):
     try:        # Cargar dataset de entrenamiento para obtener estadísticas
         train_data = pd.read_csv('movie_data_complete.csv')
         train_features = train_data.iloc[:, 4:14].values  # Columnas 4-13 (features 0-9)
-        
+
         # Calcular estadísticas del conjunto de entrenamiento
         train_mean = np.mean(train_features, axis=0)
         train_std = np.std(train_features, axis=0)
-        
+
         # Si tenemos más de 10 features, necesitamos reducir dimensionalidad
         if len(features) > 10:
             st.info(f"🔄 Reduciendo {len(features)} características a 10...")
-            
+
             # Aplicar PCA simple para reducir a 10 componentes
             # Usar una muestra del dataset de entrenamiento para ajustar PCA
             pca = PCA(n_components=10, random_state=42)
-            
+
             # Crear datos sintéticos para ajustar PCA (simulando el proceso original)
             synthetic_data = np.random.normal(0, 1, (100, len(features)))
             pca.fit(synthetic_data)
-            
+
             # Transformar la muestra actual
             features_reduced = pca.transform(features.reshape(1, -1))[0]
         else:
             features_reduced = features[:10] if len(features) >= 10 else np.pad(features, (0, 10-len(features)), 'constant')
-            
+
         # Normalizar usando estadísticas del conjunto de entrenamiento
         normalized_features = (features_reduced - train_mean) / (train_std + 1e-8)
-        
+
         return normalized_features
-        
+
     except Exception as e:
         st.error(f"Error en normalización simple: {str(e)}")
         # Fallback final: devolver características normalizadas simples
@@ -336,10 +336,10 @@ def process_uploaded_image_corrected(uploaded_image):
 
             # Paso 2: Aplicar el MISMO preprocesamiento que durante el entrenamiento
             st.info("🔄 Aplicando preprocesamiento (normalización + reducción dimensional)...")
-            
+
             # Cargar pipeline de preprocesamiento
             preprocessing_pipeline = load_preprocessing_pipeline()
-            
+
             # Aplicar preprocesamiento para obtener exactamente 10 características
             reduced_features = apply_preprocessing_pipeline(features, preprocessing_pipeline)
 
@@ -350,7 +350,7 @@ def process_uploaded_image_corrected(uploaded_image):
                 with st.expander("🔧 Debug - Análisis del Pipeline", expanded=False):
                     st.write(f"**Pipeline Original:**")
                     st.write(f"  - HSV: ~96 características")
-                    st.write(f"  - LBP: ~26 características") 
+                    st.write(f"  - LBP: ~26 características")
                     st.write(f"  - Hu Moments: 7 características")
                     st.write(f"  - Total extraído: {len(features)} características")
                     st.write(f"**Preprocesamiento:**")
@@ -390,7 +390,7 @@ def process_image_from_url_corrected(poster_url):
             # Aplicar preprocesamiento usando el mismo pipeline que durante entrenamiento
             preprocessing_pipeline = load_preprocessing_pipeline()
             reduced_features = apply_preprocessing_pipeline(features, preprocessing_pipeline)
-            
+
             if reduced_features is not None and len(reduced_features) == 10:
                 return reduced_features
             else:
@@ -399,7 +399,7 @@ def process_image_from_url_corrected(poster_url):
         else:
             st.error("❌ Error en la extracción de características desde URL")
             return None
-            
+
     except Exception as e:
         st.error(f"Error al procesar imagen desde URL {poster_url}: {str(e)}")
         return None
