@@ -1,0 +1,2 @@
+total_movies,features_count,n_clusters,silhouette_score,inertia,iterations,pca_variance_explained
+5466,10,8,0.3245657942801851,12775.429089378036,23,0.676918461144308
