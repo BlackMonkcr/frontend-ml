@@ -1,0 +1,2 @@
+Dataset,Movies,Features,KMeans_Clusters,KMeans_Silhouette,KMeans_Inertia,DBSCAN_Clusters,DBSCAN_Noise,DBSCAN_Silhouette
+Características + Géneros,5466,12,3,0.2724035348969751,37006.57381557861,2,23,-0.04873582693169139

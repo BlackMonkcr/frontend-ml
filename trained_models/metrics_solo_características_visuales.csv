@@ -1,0 +1,2 @@
+Dataset,Movies,Features,KMeans_Clusters,KMeans_Silhouette,KMeans_Inertia,DBSCAN_Clusters,DBSCAN_Noise,DBSCAN_Silhouette
+Solo Características Visuales,5466,12,3,0.2589350334169821,38651.605006554695,2,83,-0.0027669422099536826
