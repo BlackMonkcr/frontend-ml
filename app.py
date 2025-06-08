@@ -607,10 +607,20 @@ except Exception as e:
 try:
     df_movies = load_movie_data(csv_path)
 
+    # Cargar también el dataset con años para el filtro por año
+    try:
+        df_movies_with_years = pd.read_csv("prim_links_title.csv")
+        st.sidebar.success("✅ Dataset con años cargado correctamente")
+    except Exception as e:
+        st.sidebar.warning(f"⚠️ No se pudo cargar prim_links_title.csv: {str(e)}")
+        df_movies_with_years = None
+
     # Verificar estructura del CSV
     st.sidebar.markdown("### 📊 Info del Dataset")
     st.sidebar.markdown(f"**Películas:** {len(df_movies)}")
     st.sidebar.markdown(f"**Columnas:** {list(df_movies.columns)}")
+    if df_movies_with_years is not None:
+        st.sidebar.markdown(f"**Películas con años:** {len(df_movies_with_years)}")
 
     # Verificar columnas mínimas necesarias
     if 'title' not in df_movies.columns:
@@ -642,7 +652,7 @@ except Exception as e:
 st.header("🔍 Busca tu película")
 
 # Crear tabs para diferentes métodos de búsqueda
-tab1, tab2 = st.tabs(["📝 Buscar por título", "🖼️ Buscar por imagen"])
+tab1, tab2, tab3 = st.tabs(["📝 Buscar por título", "🖼️ Buscar por imagen", "📅 Filtrar por año"])
 
 with tab1:
     search_term = st.text_input("Escribe el título de una película:", "")
@@ -797,6 +807,172 @@ with tab2:
                         display_poster(movie['poster_url'], movie_title, width=120)
                         st.caption("Puedes descargar y usar esta imagen")
 
+with tab3:
+    st.markdown("**Filtra películas por año** y selecciona una para ver recomendaciones similares")
+
+    # Verificar si tenemos el dataset con años disponible
+    if df_movies_with_years is not None:
+        # Obtener años únicos disponibles
+        available_years = sorted(df_movies_with_years['year'].dropna().unique())
+
+        if len(available_years) > 0:
+            # Selector de año
+            selected_year = st.selectbox(
+                "Selecciona un año:",
+                available_years,
+                index=len(available_years)//2,  # Empezar en un año del medio
+                help="Elige el año para filtrar las películas"
+            )
+
+            # Filtrar películas por año seleccionado
+            movies_in_year = df_movies_with_years[df_movies_with_years['year'] == selected_year]
+
+            if len(movies_in_year) > 0:
+                st.success(f"✅ Encontradas {len(movies_in_year)} películas del año {selected_year}")
+
+                # Mostrar algunas películas del año como preview
+                with st.expander(f"🎬 Ver todas las películas de {selected_year}", expanded=True):
+                    # Mostrar las primeras 6 películas como preview
+                    preview_movies = movies_in_year.head(6)
+                    cols = st.columns(3)
+
+                    for i, (idx, movie) in enumerate(preview_movies.iterrows()):
+                        with cols[i % 3]:
+                            movie_title = movie.get('title', f'Película {idx}')
+                            st.write(f"**{movie_title}**")
+                            if 'poster_url' in movie and pd.notna(movie['poster_url']) and movie['poster_url'] != '':
+                                display_poster(movie['poster_url'], movie_title, width=100)
+
+                    if len(movies_in_year) > 6:
+                        st.info(f"Y {len(movies_in_year) - 6} películas más...")
+
+                # Selector de película específica del año
+                st.markdown("---")
+                st.markdown("### 🎯 Seleccionar Película para Recomendaciones")
+
+                # Crear un selectbox con las películas del año
+                movie_options = [(idx, f"{row['title']} ({row['year']})") for idx, row in movies_in_year.iterrows()]
+
+                if movie_options:
+                    selected_movie_info = st.selectbox(
+                        "Escoge una película específica:",
+                        movie_options,
+                        format_func=lambda x: x[1],  # Mostrar título con año
+                        help="Selecciona una película para ver recomendaciones similares"
+                    )
+
+                    selected_movie_idx, selected_movie_display = selected_movie_info
+                    selected_movie = df_movies_with_years.loc[selected_movie_idx]
+
+                    st.subheader(f"Película seleccionada: {selected_movie['title']}")
+
+                    # Mostrar información de la película seleccionada
+                    col1, col2 = st.columns([1, 3])
+
+                    with col1:
+                        poster_displayed = False
+                        if 'poster_url' in selected_movie and pd.notna(selected_movie['poster_url']) and selected_movie['poster_url'] != '':
+                            poster_displayed = display_poster(selected_movie['poster_url'], selected_movie['title'], 200)
+
+                        if not poster_displayed:
+                            st.warning("Poster no disponible")
+
+                    with col2:
+                        st.markdown(f"**Movie ID:** {selected_movie.get('movieId', 'N/A')}")
+                        st.markdown(f"**Año:** {selected_movie['year']}")
+                        if 'title_cleaned' in selected_movie:
+                            st.markdown(f"**Título limpio:** {selected_movie['title_cleaned']}")
+                        if 'poster_source' in selected_movie:
+                            st.markdown(f"**Fuente del poster:** {selected_movie['poster_source']}")
+
+                    # Buscar en el dataset principal para obtener el índice correcto para las recomendaciones
+                    movie_id = selected_movie.get('movieId')
+                    matching_movie = None
+                    matching_index = None
+
+                    if movie_id is not None:
+                        # Buscar por movieId en el dataset principal
+                        if 'movieId' in df_movies.columns:
+                            matching_movies = df_movies[df_movies['movieId'] == movie_id]
+                            if len(matching_movies) > 0:
+                                matching_index = matching_movies.index[0]
+                                matching_movie = matching_movies.iloc[0]
+
+                    # Si no se encontró por movieId, buscar por título
+                    if matching_movie is None:
+                        title_to_search = selected_movie['title']
+                        matching_movies = df_movies[df_movies['title'].str.contains(
+                            title_to_search.split('(')[0].strip(), case=False, na=False
+                        )]
+                        if len(matching_movies) > 0:
+                            matching_index = matching_movies.index[0]
+                            matching_movie = matching_movies.iloc[0]
+
+                    # Botones de recomendación
+                    st.markdown("---")
+                    col_a, col_b = st.columns(2)
+
+                    with col_a:
+                        if matching_index is not None:
+                            if st.button("🎯 Similares por K-means", use_container_width=True, key="year_search_cluster"):
+                                with st.spinner('Buscando recomendaciones por K-means...'):
+                                    similar_indices = api.search_similar_movies(matching_index)
+                                    display_recommendations(similar_indices, f"🎬 Películas similares a {selected_movie['title']} (K-means):")
+                        else:
+                            st.warning("No se encontró esta película en el dataset de entrenamiento")
+
+                    with col_b:
+                        if ('poster_url' in selected_movie and pd.notna(selected_movie['poster_url']) and
+                            selected_movie['poster_url'] != ''):
+                            if st.button("🖼️ Similares por Poster", use_container_width=True, key="year_search_poster"):
+                                with st.spinner('Analizando poster (10 features)...'):
+                                    similar_indices = api.search_similar_movies_by_title_and_poster(
+                                        selected_movie['title'],
+                                        selected_movie['poster_url']
+                                    )
+                                    display_recommendations(similar_indices, f"🎬 Películas similares a {selected_movie['title']} (Análisis Visual):")
+                        else:
+                            st.info("🖼️ Análisis visual no disponible (sin URL de poster)")
+
+                    # Información adicional sobre el filtro por año
+                    with st.expander("📊 Estadísticas del año seleccionado", expanded=False):
+                        st.write(f"**Año:** {selected_year}")
+                        st.write(f"**Total de películas:** {len(movies_in_year)}")
+
+                        # Mostrar distribución de fuentes de posters si existe la columna
+                        if 'poster_source' in movies_in_year.columns:
+                            poster_sources = movies_in_year['poster_source'].value_counts()
+                            st.write("**Fuentes de posters:**")
+                            for source, count in poster_sources.items():
+                                st.write(f"- {source}: {count} películas")
+
+                        # Películas con posters disponibles
+                        movies_with_posters = movies_in_year['poster_url'].notna().sum()
+                        st.write(f"**Películas con posters:** {movies_with_posters}/{len(movies_in_year)}")
+            else:
+                st.warning(f"No se encontraron películas para el año {selected_year}")
+        else:
+            st.error("No se encontraron años válidos en el dataset")
+    else:
+        st.error("❌ Dataset con años no disponible")
+        st.info("""
+        Para usar esta funcionalidad, asegúrate de que el archivo `prim_links_title.csv`
+        esté disponible en el directorio principal y contenga las columnas:
+        - movieId
+        - title
+        - poster_url
+        - year
+        """)
+
+        # Botón para intentar recargar el dataset
+        if st.button("🔄 Intentar recargar dataset con años", key="reload_years_dataset"):
+            try:
+                df_movies_with_years = pd.read_csv("prim_links_title.csv")
+                st.success("✅ Dataset con años recargado correctamente")
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Error al recargar dataset: {str(e)}")
+
 # 6. INFORMACIÓN ADICIONAL EN SIDEBAR
 
 st.sidebar.header("📝 Instrucciones")
@@ -820,6 +996,13 @@ st.sidebar.markdown("""
 2. Sube una imagen de poster
 3. Se extraen 10 características automáticamente
 4. Se buscan películas similares
+
+**Filtrar por año:**
+1. Ve a "📅 Filtrar por año"
+2. Selecciona un año de la lista
+3. Explora las películas de ese año
+4. Escoge una película específica
+5. Obtén recomendaciones similares
 """)
 
 st.sidebar.markdown("---")
