@@ -1156,8 +1156,3 @@ if st.button("🎲 Descubre Películas Aleatorias", key="random_discovery"):
 
             if 'poster_url' in movie and pd.notna(movie['poster_url']) and movie['poster_url'] != '':
                 display_poster(movie['poster_url'], movie_title, width=120)
-
-            if st.button(f"Ver similares", key=f"random_{idx}"):
-                with st.spinner(f'Buscando películas similares a {movie_title}...'):
-                    similar_indices = api.search_similar_movies(idx)
-                    display_recommendations(similar_indices, f"Similares a {movie_title}:")
